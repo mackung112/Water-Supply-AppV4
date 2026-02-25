@@ -5,7 +5,6 @@
 var Form = {
     personnelData: [],
 
-    // Example Installation Images
     installImages: [
         { name: "แบบมาตรฐาน 1 (ท่อลอย)", url: "https://img.lazcdn.com/g/p/3c730a52fdb8a1dba2c435418b4ee28c.jpg_960x960q80.jpg_.webp1" },
         { name: "แบบมาตรฐาน 2 (ฝังดิน)", url: "https://chopanich.com/wp-content/uploads/2020/02/angle_ball_valves5.jpg" },
@@ -13,6 +12,10 @@ var Form = {
         { name: "แบบมาตรฐาน 3 (ท่อลอย)", url: "https://i.ytimg.com/vi/xtxF4ibCzug/maxresdefault.jpg" },
         { name: "แบบมาตรฐาน 4 (ท่อลอย)", url: "https://i.ytimg.com/vi/bxbFQjpfi6U/hq720.jpg" },
     ],
+
+    // Global Leaflet map instance and marker
+    mapInstance: null,
+    mapMarker: null,
 
     // ============================================================
     // 1. INITIALIZATION
@@ -46,6 +49,9 @@ var Form = {
                 if (gisInput) {
                     gisInput.addEventListener('change', Form.handleGisUpload);
                 }
+
+                // Initialize Leaflet Map
+                Form.initMap();
 
                 // Check Data Source (Priority: Session -> URL -> New)
                 const sessionData = sessionStorage.getItem('CURRENT_EDIT_JOB');
@@ -263,13 +269,9 @@ var Form = {
             amphoe: rawData.Amphoe,
             province: rawData.Province,
             mapUrl: rawData.Map_URL,
-            province: rawData.Province,
-            mapUrl: rawData.Map_URL,
             imageUrl: rawData.Image_URL,
             gisImageUrl: rawData.Gis_Image_URL,
 
-            // Standardize variables for DB/Report compatibility
-            Map_URL: rawData.Map_URL,
             // Standardize variables for DB/Report compatibility
             Map_URL: rawData.Map_URL,
             Image_URL: rawData.Image_URL,
@@ -301,9 +303,9 @@ var Form = {
             if (res.status === 'success') {
                 localStorage.removeItem('cache_dashboard_jobs');
                 sessionStorage.removeItem('CURRENT_EDIT_JOB');
-                await Form.cacheReportData(); // Update cache after save
+                Form.cacheReportData(); // Update cache after save (fire-and-forget, no await)
                 Utils.showToast("บันทึกข้อมูลเรียบร้อย!");
-                setTimeout(() => Router.load('dashboard'), 1000);
+                setTimeout(() => Router.load('dashboard'), 500);
             } else {
                 throw new Error(res.message);
             }
@@ -361,7 +363,7 @@ var Form = {
         }
     },
 
-    printReport: async (type) => {
+    printAllReports: async () => {
         const jobIdInput = document.querySelector('[name="Job_ID"]');
         const jobId = jobIdInput ? jobIdInput.value : '';
 
@@ -370,32 +372,29 @@ var Form = {
             return;
         }
 
-        let reportPath = '';
-        switch (type) {
-            case 'quotation': reportPath = 'pages/form/reports/r1_detail/r1.html'; break;
-            case 'estimate': reportPath = 'pages/form/reports/r2_detail/r2.html'; break;
-            case 'layout': reportPath = 'pages/form/reports/r3_detail/r3.html'; break;
-        }
+        // เปิด 3 หน้าต่างพร้อมกัน (หน่วงเวลา 100ms ป้องกันเบราว์เซอร์บล็อก popup หรือเปิดไม่ครบ)
+        window.open(`pages/form/reports/r1_detail/r1.html?id=${jobId}`, '_blank');
 
-        if (reportPath) {
-            // เปิดหน้าต่างรายงาน
-            window.open(`${reportPath}?id=${jobId}`, '_blank');
+        setTimeout(() => {
+            window.open(`pages/form/reports/r2_detail/r2.html?id=${jobId}`, '_blank');
+        }, 100);
 
-            // อัพเดตสถานะการปริ้น
-            try {
-                const res = await DBManager.updatePrintStatus(jobId, true);
-                if (res.status === 'success') {
-                    // ล้าง Cache เพื่อให้ Dashboard โหลดข้อมูลใหม่
-                    localStorage.removeItem('cache_dashboard_jobs');
-                    Utils.showToast('📄 ' + res.message, 'success');
-                } else {
-                    console.warn('อัพเดตสถานะการปริ้นไม่สำเร็จ:', res.message);
-                }
-            } catch (e) {
-                console.error('อัพเดตสถานะการปริ้นไม่สำเร็จ:', e);
+        setTimeout(() => {
+            window.open(`pages/form/reports/r3_detail/r3.html?id=${jobId}`, '_blank');
+        }, 200);
+
+        // อัพเดตสถานะการปริ้น
+        try {
+            const res = await DBManager.updatePrintStatus(jobId, true);
+            if (res.status === 'success') {
+                localStorage.removeItem('cache_dashboard_jobs');
+                document.getElementById('printStatusSection').classList.remove('d-none');
+                document.getElementById('printStatusDivider').classList.remove('d-none');
+                document.getElementById('printDateDisplay').innerText = Utils.formatThaiDate(new Date().toISOString());
+                Utils.showToast('📄 ออกรายงาน 3 ฉบับเรียบร้อย', 'success');
             }
-        } else {
-            console.error("Unknown report type:", type);
+        } catch (e) {
+            console.error('อัพเดตสถานะการปริ้นไม่สำเร็จ:', e);
         }
     },
 
@@ -467,6 +466,36 @@ var Form = {
         }
     },
 
+    initMap: () => {
+        const leafletMapDiv = document.getElementById('leafletMap');
+        if (!leafletMapDiv) return;
+
+        // Default to Thailand center
+        const defaultLat = 14.3532;
+        const defaultLng = 100.5691;
+
+        Form.mapInstance = L.map('leafletMap').setView([defaultLat, defaultLng], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(Form.mapInstance);
+
+        // Click event to place marker
+        Form.mapInstance.on('click', function (e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const coordsUrl = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+
+            document.querySelector('[name="Map_URL"]').value = coordsUrl;
+            Form.previewMap(coordsUrl);
+        });
+
+        // Wait for modal/container to be fully visible before invalidating size
+        setTimeout(() => {
+            Form.mapInstance.invalidateSize();
+        }, 500);
+    },
+
     getCurrentLocation: () => {
         if (!navigator.geolocation) return Utils.showToast("อุปกรณ์นี้ไม่รองรับ GPS", 'error');
         const btn = document.querySelector('button[onclick="Form.getCurrentLocation()"]');
@@ -488,35 +517,57 @@ var Form = {
     },
 
     previewMap: (val) => {
-        const frame = document.getElementById('mapFrame');
-        const img = document.getElementById('mapPreviewImg');
         const holder = document.getElementById('mapPlaceholder');
         const box = document.querySelector('.map-preview-box');
 
         if (!val || val.trim() === "") {
-            if (frame) frame.classList.add('d-none');
-            if (img) img.classList.add('d-none');
             if (holder) holder.classList.remove('d-none');
             if (box) box.style.borderStyle = 'dashed';
+            if (Form.mapMarker && Form.mapInstance) {
+                Form.mapInstance.removeLayer(Form.mapMarker);
+                Form.mapMarker = null;
+            }
             return;
         }
 
         if (box) box.style.borderStyle = 'solid';
         if (holder) holder.classList.add('d-none');
 
-        if (val.match(/\.(jpeg|jpg|gif|png)$/i)) {
-            if (img) { img.src = val; img.classList.remove('d-none'); }
-            if (frame) frame.classList.add('d-none');
-        } else {
-            let url = val;
-            // HTTPS Fix for Coordinates
-            if (/^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(val)) {
-                url = `https://maps.google.com/maps?q=${val.replace(/\s/g, '')}&z=15&output=embed`;
-            } else if (!val.includes('output=embed')) {
-                url = `https://maps.google.com/maps?q=${encodeURIComponent(val)}&z=15&output=embed`;
+        // Ensure map is initialized
+        if (!Form.mapInstance) {
+            Form.initMap();
+        }
+
+        // Try extracting coordinates
+        let lat, lng;
+
+        // Match exact coordinates like 14.35,100.55
+        const coordMatch = val.match(/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/);
+
+        if (coordMatch) {
+            lat = parseFloat(coordMatch[1]);
+            lng = parseFloat(coordMatch[3]);
+        } else if (val.includes('maps.google.com')) {
+            // Try to extract q=lat,lng from URL
+            const urlMatch = val.match(/[?&]q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
+            if (urlMatch) {
+                lat = parseFloat(urlMatch[1]);
+                lng = parseFloat(urlMatch[3]);
             }
-            if (frame) { frame.src = url; frame.classList.remove('d-none'); }
-            if (img) img.classList.add('d-none');
+        }
+
+        if (lat !== undefined && lng !== undefined) {
+            // Update Leaflet map
+            Form.mapInstance.setView([lat, lng], 15);
+
+            if (Form.mapMarker) {
+                Form.mapMarker.setLatLng([lat, lng]);
+            } else {
+                Form.mapMarker = L.marker([lat, lng]).addTo(Form.mapInstance);
+            }
+
+            // Invalidate size in case map div was hidden
+            setTimeout(() => Form.mapInstance.invalidateSize(), 100);
         }
     },
 
