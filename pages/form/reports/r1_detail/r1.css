@@ -92,7 +92,7 @@ body {
 }
 
 .garuda-logo {
-    width: 1.5cm;
+    width: 2cm;
     height: auto;
 }
 
@@ -114,8 +114,9 @@ body {
 }
 
 .date-section {
-    text-align: center;
-    padding-left: 15%;
+    text-align: left;
+    margin-left: 50%;
+    padding-left: 0;
     margin-bottom: 10px;
     margin-top: 5px;
 }

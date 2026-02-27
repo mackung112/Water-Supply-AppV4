@@ -66,5 +66,65 @@ const Router = {
     }
 };
 
-// โหลดหน้า Dashboard เมื่อทุกอย่างพร้อม
-window.onload = () => Router.load('dashboard');
+/**
+ * Authentication Helper
+ */
+const Auth = {
+    // รหัสผ่านที่ใช้เข้าสู่ระบบ
+    PASSWORD: "1160@OES",
+
+    init: () => {
+        const overlay = document.getElementById('loginOverlay');
+        const isLogged = sessionStorage.getItem('IS_LOGGED_IN');
+
+        if (isLogged === 'true') {
+            // ซ่อนหน้าล็อกอิน ดึง dashboard ได้เลย
+            if (overlay) overlay.classList.add('d-none');
+            Router.load('dashboard');
+        } else {
+            // แสดงหน้าล็อกอิน
+            if (overlay) overlay.classList.remove('d-none');
+            const passInput = document.getElementById('loginPassword');
+            if (passInput) passInput.focus();
+        }
+    },
+
+    login: () => {
+        const passInput = document.getElementById('loginPassword');
+        const errorMsg = document.getElementById('loginError');
+        const val = passInput ? passInput.value.trim() : '';
+
+        if (val === Auth.PASSWORD) {
+            sessionStorage.setItem('IS_LOGGED_IN', 'true');
+            if (errorMsg) errorMsg.classList.add('d-none');
+
+            // Animation ซ่อน Overlay
+            const overlay = document.getElementById('loginOverlay');
+            if (overlay) {
+                overlay.style.transition = 'opacity 0.4s ease';
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.classList.add('d-none');
+                    // โหลด dashboard เมื่อล๊อกอินสำเร็จ
+                    Router.load('dashboard');
+                }, 400);
+            } else {
+                Router.load('dashboard');
+            }
+        } else {
+            // รหัสผิด
+            if (errorMsg) errorMsg.classList.remove('d-none');
+            if (passInput) {
+                passInput.value = '';
+                passInput.focus();
+
+                // สั่นตักเตือน
+                passInput.classList.add('is-invalid');
+                setTimeout(() => passInput.classList.remove('is-invalid'), 600);
+            }
+        }
+    }
+};
+
+// เริ่มตรวจสอบ Auth เมื่อทุกอย่างพร้อม
+window.onload = () => Auth.init();

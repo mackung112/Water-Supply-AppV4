@@ -25,6 +25,34 @@
 
 <body>
 
+    <!-- Login Overlay -->
+    <div id="loginOverlay"
+        class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+        style="z-index: 9999; background: linear-gradient(135deg, #005c97 0%, #363795 100%);">
+        <div class="text-center p-4 p-md-5 rounded-4 shadow-lg"
+            style="background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); max-width: 400px; width: 90%;">
+            <img src="assets/images/logo.png" alt="OES Logo"
+                style="height: 90px; width: auto; border-radius: 18px; margin-bottom: 1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
+            <h4 class="fw-bold text-primary mb-0">Online Estimation System</h4>
+            <p class="text-muted small mb-4">ระบบประมาณการออนไลน์</p>
+
+            <div class="mb-3 text-start">
+                <label class="form-label text-muted small fw-bold"><i
+                        class="fa-solid fa-lock me-1"></i>รหัสเข้าใช้งาน</label>
+                <input type="password" id="loginPassword" class="form-control form-control-lg text-center rounded-pill"
+                    placeholder="กรุณาใส่รหัสผ่าน" autocomplete="off" onkeydown="if(event.key==='Enter') Auth.login()">
+                <div id="loginError" class="text-danger small mt-2 d-none">
+                    <i class="fa-solid fa-circle-exclamation me-1"></i>รหัสผ่านไม่ถูกต้อง
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100 rounded-pill py-2 shadow btn-hover-scale fw-bold"
+                onclick="Auth.login()">
+                <i class="fa-solid fa-right-to-bracket me-2"></i>เข้าสู่ระบบ
+            </button>
+        </div>
+    </div>
+
     <nav class="navbar navbar-expand-lg navbar-dark bg-water-theme shadow-lg sticky-top py-2">
         <div class="container">
             <a class="brand-container" href="#" onclick="Router.load('dashboard'); return false;">
