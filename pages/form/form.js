@@ -184,7 +184,7 @@ var Form = {
         Form.updateSignature('surveyor');
         Form.updateSignature('inspector');
         Form.updateSignature('approver');
-        Form.updatePrintButtonsVisibility();
+
 
         // แสดงสถานะการปริ้น
         const printDate = job.printDate; // Use 'job' instead of 'data'
@@ -229,8 +229,7 @@ var Form = {
             if (job.items && job.items.length > 0) ItemsComponent.setItems(job.items);
         }
 
-        // Update print buttons visibility based on Estimate No
-        Form.updatePrintButtonsVisibility();
+
 
         // Cache report data for faster loading
         Form.cacheReportData();
@@ -422,27 +421,7 @@ var Form = {
         }
     },
 
-    /**
-     * อัพเดตการแสดงปุ่มพิมพ์รายงานตามเงื่อนไข Estimate No
-     */
-    updatePrintButtonsVisibility: () => {
-        const estimateNoInput = document.querySelector('[name="Estimate_No"]');
-        const printGroup = document.getElementById('printButtonGroup');
 
-        if (!estimateNoInput || !printGroup) return;
-
-        const estimateNo = estimateNoInput.value.trim();
-
-        if (estimateNo && estimateNo !== '') {
-            // มีเลขประมาณการ -> แสดงปุ่ม
-            printGroup.classList.remove('d-none');
-            printGroup.classList.add('d-flex');
-        } else {
-            // ไม่มีเลขประมาณการ -> ซ่อนปุ่ม
-            printGroup.classList.remove('d-flex');
-            printGroup.classList.add('d-none');
-        }
-    },
 
     /**
      * บันทึกข้อมูลสำหรับรายงานลง sessionStorage
