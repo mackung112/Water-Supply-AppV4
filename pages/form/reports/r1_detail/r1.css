@@ -50,7 +50,7 @@ body {
     background: white;
     position: relative;
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-    padding: 10mm 20mm 20mm 20mm;
+    padding: 10mm 20mm 20mm 25mm;
     box-sizing: border-box;
     font-size: 16pt;
     line-height: 1.2;
@@ -80,6 +80,7 @@ body {
     position: relative;
     z-index: 2;
     text-align: left;
+    padding-top: 1.2em;
 }
 
 .header-center {
@@ -102,6 +103,7 @@ body {
     position: relative;
     z-index: 2;
     padding-left: 2cm;
+    padding-top: 1.2em;
 }
 
 .header-right div {
@@ -118,7 +120,8 @@ body {
     margin-left: 50%;
     padding-left: 0;
     margin-bottom: 10px;
-    margin-top: 5px;
+    margin-top: 1.5em;
+    /* ขยับลง 1 บรรทัด */
 }
 
 .date-section.paragraph {
@@ -314,7 +317,7 @@ body {
         height: 297mm;
         max-height: 297mm;
         margin: 0;
-        padding: 10mm 20mm 20mm 20mm;
+        padding: 10mm 20mm 20mm 25mm;
         /* เหมือนหน้าจอ */
         box-shadow: none;
         border: none;

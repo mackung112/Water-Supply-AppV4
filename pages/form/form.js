@@ -362,7 +362,7 @@ var Form = {
         }
     },
 
-    printAllReports: async () => {
+    printReport: async (type) => {
         const jobIdInput = document.querySelector('[name="Job_ID"]');
         const jobId = jobIdInput ? jobIdInput.value : '';
 
@@ -371,29 +371,30 @@ var Form = {
             return;
         }
 
-        // เปิด 3 หน้าต่างพร้อมกัน (หน่วงเวลา 100ms ป้องกันเบราว์เซอร์บล็อก popup หรือเปิดไม่ครบ)
-        window.open(`pages/form/reports/r1_detail/r1.html?id=${jobId}`, '_blank');
+        let reportPath = '';
+        switch (type) {
+            case 'quotation': reportPath = 'pages/form/reports/r1_detail/r1.html'; break;
+            case 'estimate': reportPath = 'pages/form/reports/r2_detail/r2.html'; break;
+            case 'layout': reportPath = 'pages/form/reports/r3_detail/r3.html'; break;
+        }
 
-        setTimeout(() => {
-            window.open(`pages/form/reports/r2_detail/r2.html?id=${jobId}`, '_blank');
-        }, 100);
+        if (reportPath) {
+            window.open(`${reportPath}?id=${jobId}`, '_blank');
 
-        setTimeout(() => {
-            window.open(`pages/form/reports/r3_detail/r3.html?id=${jobId}`, '_blank');
-        }, 200);
-
-        // อัพเดตสถานะการปริ้น
-        try {
-            const res = await DBManager.updatePrintStatus(jobId, true);
-            if (res.status === 'success') {
-                localStorage.removeItem('cache_dashboard_jobs');
-                document.getElementById('printStatusSection').classList.remove('d-none');
-                document.getElementById('printStatusDivider').classList.remove('d-none');
-                document.getElementById('printDateDisplay').innerText = Utils.formatThaiDate(new Date().toISOString());
-                Utils.showToast('📄 ออกรายงาน 3 ฉบับเรียบร้อย', 'success');
+            // อัพเดตสถานะการปริ้น
+            try {
+                const res = await DBManager.updatePrintStatus(jobId, true);
+                if (res.status === 'success') {
+                    localStorage.removeItem('cache_dashboard_jobs');
+                    document.getElementById('printStatusSection').classList.remove('d-none');
+                    document.getElementById('printStatusDivider').classList.remove('d-none');
+                    document.getElementById('printDateDisplay').innerText = Utils.formatThaiDate(new Date().toISOString());
+                }
+            } catch (e) {
+                console.error('อัพเดตสถานะการปริ้นไม่สำเร็จ:', e);
             }
-        } catch (e) {
-            console.error('อัพเดตสถานะการปริ้นไม่สำเร็จ:', e);
+        } else {
+            console.error("Unknown report type:", type);
         }
     },
 
