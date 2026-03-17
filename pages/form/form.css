@@ -36,6 +36,17 @@
     position: relative;
 }
 
+/* MapLibre Map Container */
+#pipeMap {
+    width: 100%;
+    height: 100%;
+}
+
+#pipeMap .maplibregl-canvas {
+    border-radius: inherit;
+}
+
+.map-preview-box:has(#pipeMap),
 .map-preview-box:has(img:not(.d-none)),
 .install-preview-box:has(img:not(.d-none)) {
     border: 1px solid #dee2e6 !important;
@@ -109,5 +120,145 @@
 @media (min-width: 769px) {
     .border-end-md {
         border-right: 1px solid #dee2e6;
+    }
+}
+
+/* ========================================
+   5.5 Map Search Results Dropdown
+   ======================================== */
+.map-search-results {
+    position: absolute;
+    z-index: 1050;
+    width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    margin-top: -0.5rem;
+}
+
+.map-search-results .search-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.15s;
+}
+
+.map-search-results .search-item:last-child {
+    border-bottom: none;
+}
+
+.map-search-results .search-item:hover {
+    background: #e8f4fd;
+}
+
+.map-search-results .search-item i {
+    color: #e63946;
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.map-search-results .search-item .search-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #333;
+}
+
+.map-search-results .search-item .search-address {
+    font-size: 0.75rem;
+    color: #888;
+    line-height: 1.3;
+}
+
+.map-search-results .search-loading,
+.map-search-results .search-empty {
+    padding: 0.75rem;
+    text-align: center;
+    color: #999;
+    font-size: 0.85rem;
+}
+
+/* Expanded mode: position relative to header */
+.map-search-results-expanded {
+    position: fixed;
+    top: 55px;
+    right: 110px;
+    width: 400px;
+}
+
+/* ========================================
+   6. Map Fullscreen Overlay
+   ======================================== */
+.map-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9990;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    animation: mapSlideUp 0.3s ease-out;
+}
+
+@keyframes mapSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.map-fullscreen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.map-fullscreen-body {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.map-fullscreen-body #pipeMap {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.map-fullscreen-footer {
+    padding: 0.5rem 1.25rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid #dee2e6;
+    color: #6c757d;
+    font-size: 0.8rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .map-fullscreen-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .map-fullscreen-header .input-group {
+        max-width: 100% !important;
     }
 }

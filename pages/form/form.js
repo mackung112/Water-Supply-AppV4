@@ -16,6 +16,8 @@ var Form = {
     // Global Leaflet map instance and marker
     mapInstance: null,
     mapMarker: null,
+    isMapExpanded: false,
+    searchTimer: null,
 
     // ============================================================
     // 1. INITIALIZATION
@@ -52,6 +54,7 @@ var Form = {
 
                 // Initialize Leaflet Map
                 Form.initMap();
+                Form.initSearchInputs();
 
                 // Check Data Source (Priority: Session -> URL -> New)
                 const sessionData = sessionStorage.getItem('CURRENT_EDIT_JOB');
@@ -447,33 +450,285 @@ var Form = {
     },
 
     initMap: () => {
-        const leafletMapDiv = document.getElementById('leafletMap');
-        if (!leafletMapDiv) return;
+        const mapDiv = document.getElementById('pipeMap');
+        if (!mapDiv) return;
 
-        // Default to Thailand center
-        const defaultLat = 14.3532;
-        const defaultLng = 100.5691;
+        // ===== PWA GIS API Config =====
+        const API_KEY = "uVo4Txm5cyqWTfNOBKGTGx2PRc7uzVYhE07hdE0MrN2BgkPbjxmUKWD70ZHVjG5k";
+        const STYLE_URL = "https://gisapi-gateway.pwa.co.th/api/2.0/resources/styles/pwa-styles/styles-std?api_key=" + API_KEY;
+        const TILE_PIPE = "https://gisapi-gateway.pwa.co.th/api/2.0/resources/tiles/pwa-tiles/pwa-tile-pipe-b5541021?api_key=" + API_KEY;
+        const SRC_PIPE = "665c60f8dd708e21f678ae25";
 
-        Form.mapInstance = L.map('leafletMap').setView([defaultLat, defaultLng], 12);
+        // Base Style (OSM Raster + Sprite/Glyphs for pipe symbols)
+        const baseStyle = {
+            version: 8,
+            name: "PipeMapStyle",
+            sprite: "https://gisdb.pwa.co.th/core/api/tiles/1.0-beta/sprite/65792edcd715b5ab12310280/sprites",
+            glyphs: "https://gisdb.pwa.co.th/core/tiles/fonts/{fontstack}/{range}.pbf",
+            sources: {
+                carto: {
+                    type: "raster",
+                    tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                    tileSize: 256
+                }
+            },
+            layers: [
+                { id: "carto-base", type: "raster", source: "carto" }
+            ]
+        };
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(Form.mapInstance);
-
-        // Click event to place marker
-        Form.mapInstance.on('click', function (e) {
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            const coordsUrl = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-
-            document.querySelector('[name="Map_URL"]').value = coordsUrl;
-            Form.previewMap(coordsUrl);
+        // สร้าง MapLibre instance
+        Form.mapInstance = new maplibregl.Map({
+            container: "pipeMap",
+            style: baseStyle,
+            center: [100.5691, 14.3532], // อยุธยา [lng, lat]
+            zoom: 14,
+            maxZoom: 19
         });
 
-        // Wait for modal/container to be fully visible before invalidating size
-        setTimeout(() => {
-            Form.mapInstance.invalidateSize();
-        }, 500);
+        // เพิ่มปุ่ม zoom/rotate
+        Form.mapInstance.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+        // โหลด pipe layers เมื่อ map พร้อม
+        Form.mapInstance.on("load", async () => {
+            try {
+                const res = await fetch(STYLE_URL);
+                const styleJSON = await res.json();
+
+                // เพิ่ม pipe vector source
+                Form.mapInstance.addSource("pipe", {
+                    type: "vector",
+                    url: TILE_PIPE
+                });
+
+                // Filter เอาเฉพาะ pipe layers แล้วเพิ่มเข้า map
+                const pipeLayers = styleJSON.layers.filter(l =>
+                    l.id.toLowerCase().includes("pipe")
+                );
+
+                pipeLayers.forEach(layer => {
+                    const newLayer = {
+                        ...layer,
+                        id: "pipe-" + layer.id,
+                        source: "pipe",
+                        "source-layer": SRC_PIPE
+                    };
+
+                    // Override paint เพื่อให้เส้นท่อหนาขึ้นและเห็นชัดขึ้น
+                    if (layer.type === 'line') {
+                        const origWidth = layer.paint?.['line-width'] || 1;
+                        const boostedWidth = typeof origWidth === 'number'
+                            ? Math.max(origWidth * 3, 2)
+                            : origWidth; // ถ้าเป็น expression ใช้ค่าเดิม
+
+                        newLayer.paint = {
+                            ...(layer.paint || {}),
+                            'line-width': boostedWidth,
+                            'line-opacity': 1.0
+                        };
+                    }
+
+                    Form.mapInstance.addLayer(newLayer);
+                });
+
+                console.log(`✅ โหลดแนวท่อสำเร็จ (${pipeLayers.length} layers)`);
+            } catch (e) {
+                console.warn("⚠️ โหลดแนวท่อไม่สำเร็จ:", e);
+            }
+        });
+
+        // คลิกเพื่อปักหมุด
+        Form.mapInstance.on('click', (e) => {
+            const { lng, lat } = e.lngLat;
+            const coordsStr = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+
+            document.querySelector('[name="Map_URL"]').value = coordsStr;
+            Form.placeMarker(lng, lat);
+            Form.reverseGeocode(lat, lng);
+
+            // อัพเดต badge พิกัด
+            const coordsBadge = document.getElementById('mapExpandCoords');
+            if (coordsBadge) coordsBadge.textContent = coordsStr;
+
+            // ซ่อน placeholder
+            const holder = document.getElementById('mapPlaceholder');
+            if (holder) holder.classList.add('d-none');
+        });
+    },
+
+    /**
+     * วาง/ย้าย marker บนแผนที่
+     * @param {number} lng - ลองจิจูด
+     * @param {number} lat - ละติจูด
+     */
+    placeMarker: (lng, lat) => {
+        if (Form.mapMarker) {
+            Form.mapMarker.setLngLat([lng, lat]);
+        } else {
+            Form.mapMarker = new maplibregl.Marker({
+                color: '#e63946',
+                draggable: true
+            })
+                .setLngLat([lng, lat])
+                .addTo(Form.mapInstance);
+
+            // อัพเดตพิกัดเมื่อลาก marker จบ
+            Form.mapMarker.on('dragend', () => {
+                const lngLat = Form.mapMarker.getLngLat();
+                const coordsStr = `${lngLat.lat.toFixed(6)},${lngLat.lng.toFixed(6)}`;
+                document.querySelector('[name="Map_URL"]').value = coordsStr;
+                Form.reverseGeocode(lngLat.lat, lngLat.lng);
+            });
+        }
+    },
+
+    // ============================================================
+    // LOCATION SEARCH (Nominatim Geocoding)
+    // ============================================================
+
+    /**
+     * ผูก event listeners สำหรับช่องค้นหาสถานที่
+     */
+    initSearchInputs: () => {
+        const bindSearch = (inputId, resultsId) => {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            input.addEventListener('input', () => {
+                clearTimeout(Form.searchTimer);
+                const query = input.value.trim();
+
+                if (query.length < 2) {
+                    document.getElementById(resultsId)?.classList.add('d-none');
+                    return;
+                }
+
+                // ตรวจสอบว่าเป็นพิกัดโดยตรงไหม (เช่น 14.35,100.55)
+                const coordMatch = query.match(/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/);
+                if (coordMatch) {
+                    document.getElementById(resultsId)?.classList.add('d-none');
+                    document.querySelector('[name="Map_URL"]').value = query;
+                    Form.previewMap(query);
+                    return;
+                }
+
+                // Debounce search 500ms
+                Form.searchTimer = setTimeout(() => {
+                    Form.searchLocation(query, resultsId);
+                }, 500);
+            });
+
+            // ซ่อน dropdown เมื่อคลิกที่อื่น
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${resultsId}`)) {
+                    document.getElementById(resultsId)?.classList.add('d-none');
+                }
+            });
+        };
+
+        bindSearch('mapSearchInput', 'mapSearchResults');
+        bindSearch('mapSearchInputExpanded', 'mapSearchResultsExpanded');
+    },
+
+    /**
+     * ค้นหาสถานที่ด้วย Nominatim API
+     * @param {string} query - คำค้นหา
+     * @param {string} resultsId - ID ของ dropdown แสดงผล
+     */
+    searchLocation: async (query, resultsId) => {
+        const resultsDiv = document.getElementById(resultsId);
+        if (!resultsDiv) return;
+
+        // แสดง loading
+        resultsDiv.innerHTML = '<div class="search-loading"><span class="spinner-border spinner-border-sm me-2"></span>กำลังค้นหา...</div>';
+        resultsDiv.classList.remove('d-none');
+
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=th&accept-language=th`;
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'WaterSupplyApp/1.0' }
+            });
+            const data = await res.json();
+
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<div class="search-empty"><i class="fa-solid fa-circle-exclamation me-1"></i>ไม่พบสถานที่</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = data.map((item, i) => {
+                const name = item.display_name.split(',')[0];
+                const address = item.display_name.split(',').slice(1, 4).join(', ');
+                return `
+                    <div class="search-item" onclick="Form.selectSearchResult(${item.lat}, ${item.lon}, '${name.replace(/'/g, "\\'")}')"
+                         data-result-id="${resultsId}">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <div>
+                            <div class="search-name">${name}</div>
+                            <div class="search-address">${address}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+        } catch (e) {
+            console.error('Search error:', e);
+            resultsDiv.innerHTML = '<div class="search-empty"><i class="fa-solid fa-triangle-exclamation me-1"></i>ค้นหาไม่สำเร็จ</div>';
+        }
+    },
+
+    /**
+     * เลือกผลลัพธ์จากการค้นหา
+     * @param {number} lat
+     * @param {number} lng
+     * @param {string} name - ชื่อสถานที่
+     */
+    selectSearchResult: (lat, lng, name) => {
+        const coordsStr = `${lat.toFixed ? lat.toFixed(6) : lat},${lng.toFixed ? lng.toFixed(6) : lng}`;
+
+        // อัพเดต hidden input
+        document.querySelector('[name="Map_URL"]').value = coordsStr;
+
+        // อัพเดตช่อง search ให้แสดงชื่อสถานที่
+        const searchInput = document.getElementById('mapSearchInput');
+        const searchInputExpanded = document.getElementById('mapSearchInputExpanded');
+        if (searchInput) searchInput.value = name;
+        if (searchInputExpanded) searchInputExpanded.value = name;
+
+        // ซ่อน dropdown ทั้งหมด
+        document.getElementById('mapSearchResults')?.classList.add('d-none');
+        document.getElementById('mapSearchResultsExpanded')?.classList.add('d-none');
+
+        // บินไปยังตำแหน่ง + ปักหมุด
+        Form.previewMap(coordsStr);
+
+        // อัพเดต badge พิกัด
+        const coordsBadge = document.getElementById('mapExpandCoords');
+        if (coordsBadge) coordsBadge.textContent = coordsStr;
+    },
+
+    /**
+     * Reverse geocode: แปลงพิกัดเป็นชื่อสถานที่
+     * @param {number} lat
+     * @param {number} lng
+     */
+    reverseGeocode: async (lat, lng) => {
+        try {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=th`;
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'WaterSupplyApp/1.0' }
+            });
+            const data = await res.json();
+
+            if (data.display_name) {
+                const name = data.display_name.split(',').slice(0, 3).join(', ');
+                const searchInput = document.getElementById('mapSearchInput');
+                const searchInputExpanded = document.getElementById('mapSearchInputExpanded');
+                if (searchInput) searchInput.value = name;
+                if (searchInputExpanded) searchInputExpanded.value = name;
+            }
+        } catch (e) {
+            console.warn('Reverse geocode failed:', e);
+        }
     },
 
     getCurrentLocation: () => {
@@ -484,7 +739,9 @@ var Form = {
 
         navigator.geolocation.getCurrentPosition(
             (pos) => {
-                const coords = `${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
                 document.querySelector('[name="Map_URL"]').value = coords;
                 Form.previewMap(coords);
                 btn.innerHTML = oldIcon;
@@ -503,8 +760,8 @@ var Form = {
         if (!val || val.trim() === "") {
             if (holder) holder.classList.remove('d-none');
             if (box) box.style.borderStyle = 'dashed';
-            if (Form.mapMarker && Form.mapInstance) {
-                Form.mapInstance.removeLayer(Form.mapMarker);
+            if (Form.mapMarker) {
+                Form.mapMarker.remove();
                 Form.mapMarker = null;
             }
             return;
@@ -528,7 +785,6 @@ var Form = {
             lat = parseFloat(coordMatch[1]);
             lng = parseFloat(coordMatch[3]);
         } else if (val.includes('maps.google.com')) {
-            // Try to extract q=lat,lng from URL
             const urlMatch = val.match(/[?&]q=(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
             if (urlMatch) {
                 lat = parseFloat(urlMatch[1]);
@@ -537,17 +793,12 @@ var Form = {
         }
 
         if (lat !== undefined && lng !== undefined) {
-            // Update Leaflet map
-            Form.mapInstance.setView([lat, lng], 15);
+            // MapLibre ใช้ [lng, lat]
+            Form.mapInstance.flyTo({ center: [lng, lat], zoom: 15 });
+            Form.placeMarker(lng, lat);
 
-            if (Form.mapMarker) {
-                Form.mapMarker.setLatLng([lat, lng]);
-            } else {
-                Form.mapMarker = L.marker([lat, lng]).addTo(Form.mapInstance);
-            }
-
-            // Invalidate size in case map div was hidden
-            setTimeout(() => Form.mapInstance.invalidateSize(), 100);
+            // resize เผื่อ container เพิ่งแสดง
+            setTimeout(() => Form.mapInstance.resize(), 100);
         }
     },
 
@@ -663,5 +914,67 @@ var Form = {
         const modalEl = document.getElementById('imageSelectModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
+    },
+
+    /**
+     * สลับโหมดแผนที่: ขยายเต็มจอ / ย่อกลับ
+     */
+    toggleMapExpand: () => {
+        const overlay = document.getElementById('mapFullscreenOverlay');
+        const fullscreenBody = document.getElementById('mapFullscreenBody');
+        const originalBox = document.getElementById('mapPreviewBox');
+        const pipeMap = document.getElementById('pipeMap');
+        const expandBtn = document.getElementById('mapExpandBtn');
+        const expandedInput = document.getElementById('mapUrlInputExpanded');
+        const mainInput = document.querySelector('[name="Map_URL"]');
+
+        if (!Form.isMapExpanded) {
+            // ===== ขยาย =====
+            Form.isMapExpanded = true;
+
+            // ย้าย map div ไปยัง fullscreen body
+            fullscreenBody.appendChild(pipeMap);
+            overlay.classList.remove('d-none');
+            document.body.style.overflow = 'hidden';
+
+            // Sync input
+            if (expandedInput && mainInput) {
+                expandedInput.value = mainInput.value;
+                expandedInput.onchange = () => {
+                    mainInput.value = expandedInput.value;
+                    Form.previewMap(expandedInput.value);
+                };
+            }
+
+            // อัพเดตปุ่ม
+            expandBtn.innerHTML = '<i class="fa-solid fa-compress me-1"></i>ย่อ';
+
+            // Resize map เพื่อให้ render เต็มพื้นที่ใหม่
+            setTimeout(() => {
+                if (Form.mapInstance) Form.mapInstance.resize();
+            }, 100);
+
+        } else {
+            // ===== ย่อกลับ =====
+            Form.isMapExpanded = false;
+
+            // ย้าย map div กลับไปที่เดิม
+            originalBox.insertBefore(pipeMap, originalBox.firstChild);
+            overlay.classList.add('d-none');
+            document.body.style.overflow = '';
+
+            // Sync input กลับ
+            if (expandedInput && mainInput) {
+                mainInput.value = expandedInput.value || mainInput.value;
+            }
+
+            // อัพเดตปุ่ม
+            expandBtn.innerHTML = '<i class="fa-solid fa-expand me-1"></i>ขยาย';
+
+            // Resize map
+            setTimeout(() => {
+                if (Form.mapInstance) Form.mapInstance.resize();
+            }, 100);
+        }
     }
 };

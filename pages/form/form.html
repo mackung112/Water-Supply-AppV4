@@ -124,18 +124,27 @@
 
                     <!-- 1. GPS Map -->
                     <div class="col-12 col-md-4 border-end-md">
-                        <label class="form-label fw-bold text-danger">พิกัดสังเขป (GPS)</label>
-                        <div class="input-group mb-2">
-                            <input type="text" name="Map_URL" id="mapUrlInput" class="form-control"
-                                placeholder="พิกัด (เช่น 14.35,100.55)" onchange="Form.previewMap(this.value)">
-                            <button class="btn btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()">
-                                <i class="fa-solid fa-crosshairs"></i>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-bold text-danger mb-0">พิกัดสังเขป (GPS)</label>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" id="mapExpandBtn"
+                                onclick="Form.toggleMapExpand()">
+                                <i class="fa-solid fa-expand me-1"></i>ขยาย
                             </button>
                         </div>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                            <input type="text" id="mapSearchInput" class="form-control border-start-0"
+                                placeholder="ค้นหาสถานที่ หรือพิกัด..." autocomplete="off">
+                            <button class="btn btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()" title="ตำแหน่งปัจจุบัน">
+                                <i class="fa-solid fa-crosshairs"></i>
+                            </button>
+                            <input type="hidden" name="Map_URL" id="mapUrlInput">
+                        </div>
+                        <div id="mapSearchResults" class="map-search-results d-none"></div>
 
                         <div class="map-preview-box rounded-3 border bg-light overflow-hidden position-relative"
-                            style="height: 280px;">
-                            <div id="leafletMap" style="width: 100%; height: 100%; z-index: 1;"></div>
+                            style="height: 280px;" id="mapPreviewBox">
+                            <div id="pipeMap" style="width: 100%; height: 100%; z-index: 1;"></div>
                             <div id="mapPlaceholder"
                                 class="text-center text-muted opacity-50 position-absolute top-50 start-50 translate-middle">
                                 <i class="fa-solid fa-map-pin fa-2x mb-2"></i><br>คลิกปักหมุดบนแผนที่
@@ -297,5 +306,35 @@
                 <div class="list-group list-group-flush" id="installImageList"></div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Map Fullscreen Overlay -->
+<div id="mapFullscreenOverlay" class="map-fullscreen-overlay d-none">
+    <div class="map-fullscreen-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-map-location-dot text-danger fa-lg"></i>
+            <span class="fw-bold fs-5">พิกัดสังเขป (GPS)</span>
+            <span id="mapExpandCoords" class="badge bg-light text-dark fw-normal ms-2"></span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="input-group" style="max-width: 400px;">
+                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" id="mapSearchInputExpanded" class="form-control form-control-sm border-start-0"
+                    placeholder="ค้นหาสถานที่ หรือพิกัด..." autocomplete="off">
+                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()" title="ตำแหน่งปัจจุบัน">
+                    <i class="fa-solid fa-crosshairs"></i>
+                </button>
+            </div>
+            <div id="mapSearchResultsExpanded" class="map-search-results map-search-results-expanded d-none"></div>
+            <button type="button" class="btn btn-sm btn-danger rounded-pill px-4 shadow-sm"
+                onclick="Form.toggleMapExpand()">
+                <i class="fa-solid fa-compress me-1"></i>ย่อกลับ
+            </button>
+        </div>
+    </div>
+    <div class="map-fullscreen-body" id="mapFullscreenBody"></div>
+    <div class="map-fullscreen-footer">
+        <i class="fa-solid fa-info-circle me-1"></i>คลิกบนแผนที่เพื่อปักหมุด · ลาก marker เพื่อย้ายตำแหน่ง · กดปุ่ม "ย่อกลับ" เมื่อเสร็จ
     </div>
 </div>
