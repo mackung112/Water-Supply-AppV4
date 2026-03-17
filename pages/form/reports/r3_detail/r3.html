@@ -7,16 +7,14 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="r3.css">
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- MapLibre GL JS -->
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 
     <script src="../../../../assets/js/core/config.js"></script>
     <script src="../../../../assets/js/core/utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 </head>
 
 <body>
@@ -68,8 +66,8 @@
             <div class="map-box">
                 <!-- If Image -->
                 <img id="val_map_img" src="" alt="Map Image" class="map-img d-none">
-                <!-- If Coordinates (Leaflet Map) -->
-                <div id="val_map_leaflet" class="map-frame d-none"></div>
+                <!-- If Coordinates (MapLibre Map) -->
+                <div id="val_map_maplibre" class="map-frame d-none"></div>
 
                 <div id="map_placeholder" class="text-muted d-none">ไม่พบข้อมูลแผนที่</div>
                 <!-- QR Code Overlay -->

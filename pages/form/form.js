@@ -46,12 +46,6 @@ var Form = {
                 Form.populatePersonnel();
                 Form.renderImagesList();
 
-                // Event Listener for GIS Image Upload
-                const gisInput = document.getElementById('gisFileInput');
-                if (gisInput) {
-                    gisInput.addEventListener('change', Form.handleGisUpload);
-                }
-
                 // Initialize Leaflet Map
                 Form.initMap();
                 Form.initSearchInputs();
@@ -155,33 +149,6 @@ var Form = {
         setInput('Image_URL', imgUrl);
         Form.previewInstallImage(imgUrl);
 
-        // GIS Image
-        const gisUrl = job.gisImageUrl || job.Gis_Image_URL || '';
-        if (gisUrl && gisUrl.startsWith('IMG-')) {
-            // It is an ID, fetch the content
-            console.log("Fetching content for GIS Image ID:", gisUrl);
-            document.getElementById('gisImgUrl').value = gisUrl; // Store ID
-
-            // Show loading placeholder
-            const imgEl = document.getElementById('gisPreviewImg');
-            if (imgEl) {
-                imgEl.classList.add('d-none');
-                // You might want to show a spinner here
-            }
-
-            // Async Fetch (Non-blocking)
-            DBManager.getImage(gisUrl).then(res => {
-                if (res.status === 'success') {
-                    Form.previewGisImage(res.data);
-                } else {
-                    console.error("Failed to load GIS Image:", res.message);
-                }
-            });
-        } else {
-            // Normal URL
-            setInput('Gis_Image_URL', gisUrl);
-            Form.previewGisImage(gisUrl);
-        }
 
         // Re-run signature updates for all roles
         Form.updateSignature('surveyor');
@@ -272,12 +239,10 @@ var Form = {
             province: rawData.Province,
             mapUrl: rawData.Map_URL,
             imageUrl: rawData.Image_URL,
-            gisImageUrl: rawData.Gis_Image_URL,
 
             // Standardize variables for DB/Report compatibility
             Map_URL: rawData.Map_URL,
             Image_URL: rawData.Image_URL,
-            Gis_Image_URL: rawData.Gis_Image_URL,
 
             // Personnel
             surveyorName: rawData.Surveyor_Name, surveyorPos: rawData.Surveyor_Pos,
@@ -816,85 +781,6 @@ var Form = {
             if (box) box.style.borderStyle = 'dashed';
         }
     },
-
-    previewGisImage: (url) => {
-        const img = document.getElementById('gisPreviewImg');
-        const holder = document.getElementById('gisPlaceholder');
-        const box = document.querySelector('.gis-preview-box');
-        if (url) {
-            // [FIX] Convert Drive URL to reliable direct link (lh3) if possible
-            if (url.includes('drive.google.com') && (url.includes('id=') || url.includes('/d/'))) {
-                try {
-                    const id = url.split('id=')[1] || url.split('/d/')[1].split('/')[0];
-                    if (id) url = `https://lh3.googleusercontent.com/d/${id}=w1000`;
-                } catch (e) { console.error("URL Conversion Error", e); }
-            }
-            if (img) {
-                img.src = url;
-                img.classList.remove('d-none');
-                // Add error handling
-                img.onerror = () => {
-                    console.error("Failed to load image:", url);
-                    img.src = 'https://via.placeholder.com/400x300?text=Load+Error';
-                };
-            }
-            if (holder) holder.classList.add('d-none');
-            if (box) box.style.borderStyle = 'solid';
-        } else {
-            if (img) img.classList.add('d-none');
-            if (holder) holder.classList.remove('d-none');
-            if (box) box.style.borderStyle = 'dashed';
-        }
-    },
-
-    handleGisUpload: async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Validations
-        if (file.size > 5 * 1024 * 1024) { // 5MB
-            Utils.showToast("ขนาดไฟล์ใหญ่เกินไป (สูงสุด 5MB)", 'error');
-            event.target.value = ''; // Reset
-            return;
-        }
-
-        // Show Loading
-        document.getElementById('gisLoadingOverlay').classList.remove('d-none');
-        document.getElementById('gisFileInput').disabled = true;
-
-        try {
-            const base64 = await Utils.fileToBase64(file);
-            const payload = {
-                fileData: base64,
-                fileName: file.name,
-                mimeType: file.type
-            };
-
-            const res = await DBManager.uploadFile(payload);
-
-            if (res.status === 'success') {
-                const imgId = res.url; // Note: 'url' here is actually the ID 'IMG-...'
-                document.getElementById('gisImgUrl').value = imgId;
-                // [FIX] Use Thumbnail URL for more reliable display
-                const fileId = imgId.split('id=')[1] || imgId.split('/d/')[1].split('/')[0];
-                const thumbUrl = `https://lh3.googleusercontent.com/d/${fileId}=w1000`;
-                Form.previewGisImage(thumbUrl);
-                Utils.showToast("อัปโหลดรูปภาพสำเร็จเรียบร้อยแล้ว");
-            } else {
-                throw new Error(res.message);
-            }
-
-        } catch (e) {
-            console.error("Upload Error:", e);
-            Utils.showToast("อัปโหลดไม่สำเร็จ: " + e.message, 'error');
-            document.getElementById('gisImgUrl').value = '';
-        } finally {
-            // Hide Loading
-            document.getElementById('gisLoadingOverlay').classList.add('d-none');
-            document.getElementById('gisFileInput').disabled = false;
-        }
-    },
-
 
 
     renderImagesList: () => {

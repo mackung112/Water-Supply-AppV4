@@ -104,22 +104,21 @@ function renderReport(job, personnel) {
     setText('val_surveyor_name_top', job.surveyorName || "..................................................");
 
 
-    // 3. แผนที่ (Map) - Logic ใหม่: GIS Image > Map URL
-    const gisVal = getValue(job, 'gisimageurl') || getValue(job, 'gis_image_url');
+    // 3. แผนที่ (Map) - ใช้จากพิกัดสังเขป (GPS) + แนวท่อ
     const mapVal = getValue(job, 'mapurl') || getValue(job, 'map_url');
 
     const mapImg = document.getElementById('val_map_img');
     const mapFrame = document.getElementById('val_map_frame');
     const mapPlace = document.getElementById('map_placeholder');
-    const leafletBox = document.getElementById('val_map_leaflet');
+    const maplibreBox = document.getElementById('val_map_maplibre');
 
     // Reset All
     if (mapImg) mapImg.classList.add('d-none');
     if (mapFrame) mapFrame.classList.add('d-none');
-    if (leafletBox) leafletBox.classList.add('d-none');
+    if (maplibreBox) maplibreBox.classList.add('d-none');
     if (mapPlace) mapPlace.classList.remove('d-none');
 
-    // Prepare QR URL (Always based on Map/GPS)
+    // Prepare QR URL
     let qrUrl = "";
     if (mapVal && mapVal.trim() !== "") {
         const isCoords = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(mapVal.trim());
@@ -130,58 +129,107 @@ function renderReport(job, personnel) {
         }
     }
 
-    // Display Logic: GIS Image vs GPS Map
-    if (gisVal && gisVal.trim() !== "") {
-        // Option A: Show GIS Image
-        if (mapPlace) mapPlace.classList.add('d-none');
-        if (mapImg) {
-            let displayUrl = gisVal;
-            // [FIX] Convert Drive URL to reliable direct link (lh3)
-            if (displayUrl.includes('drive.google.com') && (displayUrl.includes('id=') || displayUrl.includes('/d/'))) {
-                try {
-                    const id = displayUrl.split('id=')[1] || displayUrl.split('/d/')[1].split('/')[0];
-                    if (id) displayUrl = `https://lh3.googleusercontent.com/d/${id}=w1000`;
-                } catch (e) { console.error("URL Conversion Error", e); }
-            }
-
-            mapImg.src = displayUrl;
-            mapImg.classList.remove('d-none');
-
-            mapImg.onerror = () => {
-                // Fallback if image fails? Maybe show map instead? 
-                // For now, let's just log it.
-                console.error("Failed to load GIS Image");
-            };
-        }
-    } else if (mapVal && mapVal.trim() !== "") {
-        // Option B: Show GPS Map (Leaflet)
+    // Display Map from GPS coordinates with MapLibre + Pipe layers
+    if (mapVal && mapVal.trim() !== "") {
         if (mapPlace) mapPlace.classList.add('d-none');
 
         const isCoords = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(mapVal.trim());
 
-        if (isCoords && leafletBox) {
-            leafletBox.classList.remove('d-none');
+        if (isCoords && maplibreBox) {
+            maplibreBox.classList.remove('d-none');
             try {
                 const parts = mapVal.split(',');
                 const lat = parseFloat(parts[0].trim());
                 const lng = parseFloat(parts[1].trim());
 
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    if (window.myLeafletMap) window.myLeafletMap.remove();
-                    const map = L.map('val_map_leaflet', {
-                        center: [lat, lng],
-                        zoom: 15,
-                        zoomControl: false,
-                        attributionControl: false
+                    // PWA GIS API Config
+                    const API_KEY = "uVo4Txm5cyqWTfNOBKGTGx2PRc7uzVYhE07hdE0MrN2BgkPbjxmUKWD70ZHVjG5k";
+                    const STYLE_URL = "https://gisapi-gateway.pwa.co.th/api/2.0/resources/styles/pwa-styles/styles-std?api_key=" + API_KEY;
+                    const TILE_PIPE = "https://gisapi-gateway.pwa.co.th/api/2.0/resources/tiles/pwa-tiles/pwa-tile-pipe-b5541021?api_key=" + API_KEY;
+                    const SRC_PIPE = "665c60f8dd708e21f678ae25";
+
+                    const baseStyle = {
+                        version: 8,
+                        name: "R3PipeMap",
+                        sprite: "https://gisdb.pwa.co.th/core/api/tiles/1.0-beta/sprite/65792edcd715b5ab12310280/sprites",
+                        glyphs: "https://gisdb.pwa.co.th/core/tiles/fonts/{fontstack}/{range}.pbf",
+                        sources: {
+                            carto: {
+                                type: "raster",
+                                tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                                tileSize: 256
+                            }
+                        },
+                        layers: [
+                            { id: "carto-base", type: "raster", source: "carto" }
+                        ]
+                    };
+
+                    if (window.myMaplibreMap) window.myMaplibreMap.remove();
+                    const map = new maplibregl.Map({
+                        container: "val_map_maplibre",
+                        style: baseStyle,
+                        center: [lng, lat],
+                        zoom: 16,
+                        maxZoom: 19,
+                        interactive: false // รายงานไม่ต้อง interact
                     });
-                    window.myLeafletMap = map;
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-                    L.marker([lat, lng]).addTo(map);
-                    setTimeout(() => { map.invalidateSize(); }, 500);
+                    window.myMaplibreMap = map;
+
+                    // วาง marker
+                    new maplibregl.Marker({ color: '#e63946' })
+                        .setLngLat([lng, lat])
+                        .addTo(map);
+
+                    // โหลด pipe layers
+                    map.on("load", async () => {
+                        try {
+                            const res = await fetch(STYLE_URL);
+                            const styleJSON = await res.json();
+
+                            map.addSource("pipe", {
+                                type: "vector",
+                                url: TILE_PIPE
+                            });
+
+                            const pipeLayers = styleJSON.layers.filter(l =>
+                                l.id.toLowerCase().includes("pipe")
+                            );
+
+                            pipeLayers.forEach(layer => {
+                                const newLayer = {
+                                    ...layer,
+                                    id: "pipe-" + layer.id,
+                                    source: "pipe",
+                                    "source-layer": SRC_PIPE
+                                };
+
+                                if (layer.type === 'line') {
+                                    const origWidth = layer.paint?.['line-width'] || 1;
+                                    const boostedWidth = typeof origWidth === 'number'
+                                        ? Math.max(origWidth * 3, 2)
+                                        : origWidth;
+
+                                    newLayer.paint = {
+                                        ...(layer.paint || {}),
+                                        'line-width': boostedWidth,
+                                        'line-opacity': 1.0
+                                    };
+                                }
+
+                                map.addLayer(newLayer);
+                            });
+                            console.log(`✅ R3: โหลดแนวท่อสำเร็จ (${pipeLayers.length} layers)`);
+                        } catch (e) {
+                            console.warn("⚠️ R3: โหลดแนวท่อไม่สำเร็จ:", e);
+                        }
+                    });
+
+                    setTimeout(() => { map.resize(); }, 500);
                 }
-            } catch (e) { console.error("Leaflet Error", e); }
+            } catch (e) { console.error("MapLibre Error", e); }
         } else if (mapImg) {
-            // Old Map Image URL
             mapImg.classList.remove('d-none');
             mapImg.src = mapVal;
         }
