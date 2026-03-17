@@ -125,17 +125,19 @@
                     <!-- 1. GPS Map -->
                     <div class="col-12 col-md-6 border-end-md">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label fw-bold text-danger mb-0">พิกัดสังเขป (GPS)</label>
-                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" id="mapExpandBtn"
-                                onclick="Form.toggleMapExpand()">
+                            <label class="form-label fw-bold text-danger mb-0">พิกัด GPS</label>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                id="mapExpandBtn" onclick="Form.toggleMapExpand()">
                                 <i class="fa-solid fa-expand me-1"></i>ขยาย
                             </button>
                         </div>
                         <div class="input-group mb-2">
-                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                            <span class="input-group-text bg-white border-end-0"><i
+                                    class="fa-solid fa-magnifying-glass text-muted"></i></span>
                             <input type="text" id="mapSearchInput" class="form-control border-start-0"
                                 placeholder="ค้นหาสถานที่ หรือพิกัด..." autocomplete="off">
-                            <button class="btn btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()" title="ตำแหน่งปัจจุบัน">
+                            <button class="btn btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()"
+                                title="ตำแหน่งปัจจุบัน">
                                 <i class="fa-solid fa-crosshairs"></i>
                             </button>
                             <input type="hidden" name="Map_URL" id="mapUrlInput">
@@ -285,15 +287,17 @@
     <div class="map-fullscreen-header">
         <div class="d-flex align-items-center gap-2">
             <i class="fa-solid fa-map-location-dot text-danger fa-lg"></i>
-            <span class="fw-bold fs-5">พิกัดสังเขป (GPS)</span>
+            <span class="fw-bold fs-5">พิกัด GPS</span>
             <span id="mapExpandCoords" class="badge bg-light text-dark fw-normal ms-2"></span>
         </div>
         <div class="d-flex align-items-center gap-3">
             <div class="input-group" style="max-width: 400px;">
-                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <span class="input-group-text bg-white border-end-0"><i
+                        class="fa-solid fa-magnifying-glass text-muted"></i></span>
                 <input type="text" id="mapSearchInputExpanded" class="form-control form-control-sm border-start-0"
                     placeholder="ค้นหาสถานที่ หรือพิกัด..." autocomplete="off">
-                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()" title="ตำแหน่งปัจจุบัน">
+                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="Form.getCurrentLocation()"
+                    title="ตำแหน่งปัจจุบัน">
                     <i class="fa-solid fa-crosshairs"></i>
                 </button>
             </div>
@@ -306,6 +310,7 @@
     </div>
     <div class="map-fullscreen-body" id="mapFullscreenBody"></div>
     <div class="map-fullscreen-footer">
-        <i class="fa-solid fa-info-circle me-1"></i>คลิกบนแผนที่เพื่อปักหมุด · ลาก marker เพื่อย้ายตำแหน่ง · กดปุ่ม "ย่อกลับ" เมื่อเสร็จ
+        <i class="fa-solid fa-info-circle me-1"></i>คลิกบนแผนที่เพื่อปักหมุด · ลาก marker เพื่อย้ายตำแหน่ง · กดปุ่ม
+        "ย่อกลับ" เมื่อเสร็จ
     </div>
 </div>
